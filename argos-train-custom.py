@@ -1,6 +1,9 @@
 import argparse
+import hashlib
 import shutil
 import subprocess
+
+import yaml
 
 from argostrain import opennmtutils
 from argostrain.custom_dataset import CustomDataset
@@ -26,9 +29,12 @@ if __name__ == '__main__':
     parser.add_argument("--package_version", "--version", default='1.0')
     parser.add_argument("--argos_version", default="1.5")
 
+    parser.add_argument('--custom_stanza_tokenizer', type=str, default=None, required=False)
     parser.add_argument('--stanza_lang_code', type=str, required=False)
     parser.add_argument('--run_dir', type=str, default='run/', required=False)
     parser.add_argument('--open_nmt_path', type=str, default='./../OpenNMT-py/', required=False)
+
+    parser.add_argument('--no_average', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -97,19 +103,32 @@ if __name__ == '__main__':
     model_path = run_path / model_dir
 
     if 'train' in args.action:
+        config = yaml.load(Path("config.yml").open('r', encoding='utf-8'), yaml.FullLoader)
+
         run_process(["onmt_train", "-config", "config.yml"])
 
-        # Package
-        run_process(
-            [
-                f"{open_nmt_path}/tools/average_models.py",
-                "-m",
-                f"{run_path}/openmt.model_step_25000.pt",
-                f"{run_path}/openmt.model_step_30000.pt",
-                "-o",
-                f"{run_path}/averaged.pt",
-            ]
-        )
+        train_steps = config['train_steps']
+        if not args.no_average and (save_checkpoint_steps := config.get('save_checkpoint_steps', False)):
+            second_to_last = train_steps - save_checkpoint_steps
+
+            run_process(
+                [
+                    f"{open_nmt_path}/tools/average_models.py",
+                    "-m",
+                    f"{run_path}/openmt.model_step_{second_to_last}.pt",
+                    f"{run_path}/openmt.model_step_{train_steps}.pt",
+                    "-o",
+                    f"{run_path}/averaged.pt",
+                ]
+            )
+        else:
+            run_process(
+                [
+                    "ln",
+                    f"{run_path}/openmt.model_step_{train_steps}.pt"
+                    f"{run_path}/averaged.pt",
+                ]
+            )
 
         run_process(
             [
@@ -130,8 +149,51 @@ if __name__ == '__main__':
 
         run_process(["cp", f"{run_path}/sentencepiece.model", model_path])
 
+        if args.custom_stanza_tokenizer is not None:
+            stanza_lang_code = args.stanza_lang_code if args.stanza_lang_code is not None else args.from_code
 
-        if (stanza_lang_code := args.stanza_lang_code) is not None:
+            tokenize_model = Path(args.custom_stanza_tokenizer).absolute()
+
+            tokenize_path = (run_path / f"stanza/{stanza_lang_code}/tokenize/")
+            tokenize_path.mkdir(parents=True, exist_ok=True)
+
+            run_process(
+                [
+                    "ln",
+                    f"{tokenize_model}"
+                    f"{tokenize_path}/"
+                ]
+            )
+
+            with tokenize_model.open('rb') as fp:
+                md5_sum = hashlib.md5(fp.read()).hexdigest().lower()
+
+            tokenize_name = tokenize_model.name
+            if tokenize_name.endswith(".pt"):
+                tokenize_name = tokenize_name[:-3]
+
+            with Path(f"{run_path}/stanza/{stanza_lang_code}/resoures.json").open('w', encoding='utf-8') as fp:
+                resources_json = {
+                    stanza_lang_code: {
+                        "tokenize": {
+                            tokenize_name: {
+                                "md5": md5_sum
+                            }
+                        },
+                        "default_processors": {
+                            "tokenize": tokenize_name
+                        },
+                        "default_dependencies": {
+
+                        },
+                        "default_md5": md5_sum,
+                        "lang_name": args.from_name
+                    },
+                    "url": "https://www.texttechnologylab.org/"
+                }
+                json.dump(resources_json, fp, indent=4)
+
+        elif (stanza_lang_code := args.stanza_lang_code) is not None:
             import stanza
 
             # Include a Stanza sentence boundary detection model
@@ -165,11 +227,11 @@ if __name__ == '__main__':
         shutil.make_archive(model_dir, "zip", root_dir="run", base_dir=model_dir)
         run_process(["mv", f'{model_dir}.zip', package_path])
 
-    # Make .argoscheckpoint zip
+        # Make .argoscheckpoint zip
 
-    latest_checkpoint = opennmtutils.get_checkpoints()[-1]
-    print(latest_checkpoint)
-    print(latest_checkpoint.name)
-    print(latest_checkpoint.num)
+        latest_checkpoint = opennmtutils.get_checkpoints()[-1]
+        print(latest_checkpoint)
+        print(latest_checkpoint.name)
+        print(latest_checkpoint.num)
 
-    print(f'Package saved to {package_path.resolve()}')
+        print(f'Package saved to {package_path.resolve()}')

@@ -78,7 +78,7 @@ def create_dataset():
 
 
 def add_args(parser: ArgumentParser):
-    parser.add_argument('--use_mwt', action='store_true', default=True)
+    parser.add_argument('--use_mwt', action='store_true', default=False)
 
 
 if __name__ == '__main__':

@@ -160,7 +160,7 @@ if __name__ == '__main__':
             run_process(
                 [
                     "ln",
-                    f"{tokenize_model}"
+                    f"{tokenize_model}",
                     f"{tokenize_path}/"
                 ]
             )

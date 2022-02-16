@@ -9,6 +9,7 @@ from argostrain.dataset import *
 
 
 def run_process(arguments, *args, **kwargs):
+    arguments = [str(arg) for arg in arguments]
     print(" ".join(arguments))
     return subprocess.run(arguments, *args, **kwargs)
 
@@ -16,7 +17,7 @@ def run_process(arguments, *args, **kwargs):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("action", nargs="+", type=str, choices=('corpus', 'train'))
+    parser.add_argument("action", nargs="+", type=str, choices=('corpus', 'train', 'pack'))
 
     parser.add_argument("--from_code", default='ka')
     parser.add_argument("--to_code", default='en')
@@ -122,45 +123,47 @@ if __name__ == '__main__':
             ]
         )
 
+    if 'pack' in args.action:
         run_process(["mkdir", model_path])
 
         run_process(["cp", "-r", f"{run_path}/model", model_path])
 
         run_process(["cp", f"{run_path}/sentencepiece.model", model_path])
 
-    if stanza_lang_code := args.get('stanza_lang_code', False):
-        import stanza
 
-        # Include a Stanza sentence boundary detection model
-        stanza_model_located = False
-        while not stanza_model_located:
-            try:
-                stanza.download(stanza_lang_code, model_dir=str(run_path / "stanza/"), processors="tokenize")
-                stanza_model_located = True
-            except:
-                print(f"Could not locate stanza model for lang {stanza_lang_code}")
-                print(
-                    "Enter the code of a different language to attempt to use its stanza model."
-                )
-                print(
-                    "This will work best for with a similar language to the one you are attempting to translate."
-                )
-                print(
-                    "This will require manually editing the Stanza package in the finished model to change its code"
-                )
-                stanza_lang_code = input("Stanza language code (ISO 639): ")
+        if (stanza_lang_code := args.stanza_lang_code) is not None:
+            import stanza
 
-        run_process(["cp", "-r", f"{run_path}/stanza", model_path])
+            # Include a Stanza sentence boundary detection model
+            stanza_model_located = False
+            while not stanza_model_located:
+                try:
+                    stanza.download(stanza_lang_code, model_dir=str(run_path / "stanza/"), processors="tokenize")
+                    stanza_model_located = True
+                except:
+                    print(f"Could not locate stanza model for lang {stanza_lang_code}")
+                    print(
+                        "Enter the code of a different language to attempt to use its stanza model."
+                    )
+                    print(
+                        "This will work best for with a similar language to the one you are attempting to translate."
+                    )
+                    print(
+                        "This will require manually editing the Stanza package in the finished model to change its code"
+                    )
+                    stanza_lang_code = input("Stanza language code (ISO 639): ")
 
-    run_process(["cp", f"{run_path}/metadata.json", model_path])
-    run_process(["cp", f"{run_path}/README.md", model_path])
+            run_process(["cp", "-r", f"{run_path}/stanza", model_path])
 
-    package_path = (
-            Path("run") / f"translate-{args.from_code}_{args.to_code}-{package_version_code}.argosmodel"
-    )
+        run_process(["cp", f"{run_path}/metadata.json", model_path])
+        run_process(["cp", f"{run_path}/README.md", model_path])
+        run_process(["cp", f"{run_path}/metadata.json", model_path])
+        package_path = (
+                Path("run") / f"translate-{args.from_code}_{args.to_code}-{package_version_code}.argosmodel"
+        )
 
-    shutil.make_archive(model_dir, "zip", root_dir="run", base_dir=model_dir)
-    run_process(["mv", f'{model_dir}.zip', package_path])
+        shutil.make_archive(model_dir, "zip", root_dir="run", base_dir=model_dir)
+        run_process(["mv", f'{model_dir}.zip', package_path])
 
     # Make .argoscheckpoint zip
 

@@ -14,8 +14,8 @@ class CustomDataset(IDataset):
         self.from_code = from_code
         self.to_code = to_code
 
-        self.source = deque()
-        self.target = deque()
+        self.source = list()
+        self.target = list()
 
         with path.open('r', encoding='utf-8', newline='') as fp:
             iterator = iter(csv.reader(fp, delimiter='\t'))
@@ -24,7 +24,7 @@ class CustomDataset(IDataset):
             if has_header:
                 header = next(iterator)
                 from_idx = 0 if header[0] == from_code else 1
-                to_idx = 1 if header[1] == from_code else 0
+                to_idx = 1 if from_idx == 0 else 0
             else:
                 from_idx = 0
                 to_idx = 1

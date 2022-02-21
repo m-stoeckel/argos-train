@@ -1,0 +1,106 @@
+# Based on https://opennmt.net/OpenNMT-py/examples/Translation.html
+
+# General
+from_code: en
+to_code: ka
+from_name: English
+to_name: Georgian
+package_version: "1.0"
+argos_version: "1.5"
+run_dir: run_en_ka
+data_dir: data
+
+## Where the samples will be written
+save_data: "run_en_ka/opennmt_data"
+## Where the vocab(s) will be written
+src_vocab: "run_en_ka/opennmt_data/openmt.vocab"
+tgt_vocab: "run_en_ka/opennmt_data/openmt.vocab"
+
+
+# SentencePiece opts
+# FIXME currently unused
+character_coverage: 0.9995
+input_sentence_size: 1000000
+shuffle_input_sentence: true
+
+# Should match the vocab size for SentencePiece
+# https://forum.opennmt.net/t/opennmt-py-error-when-training-with-large-amount-of-data/4310/12?u=argosopentech
+src_vocab_size: 50000
+tgt_vocab_size: 50000
+
+share_vocab: False
+
+# Corpus opts:
+data:
+    corpus_1:
+        path_src: "data/split_data/en-train.txt"
+        path_tgt: "data/split_data/ka-train.txt"
+        transforms: [sentencepiece, filtertoolong]
+    valid:
+        path_src: "data/split_data/en-val.txt"
+        path_tgt: "data/split_data/ka-val.txt"
+        transforms: [sentencepiece, filtertoolong]
+
+
+### Transform related opts:
+#### https://opennmt.net/OpenNMT-py/FAQ.html#how-do-i-use-the-transformer-model
+#### Subword
+src_subword_model: "spm/spm_en.model"
+tgt_subword_model: "spm/spm_ka.model"
+src_subword_nbest: 1
+src_subword_alpha: 0.0
+tgt_subword_nbest: 1
+tgt_subword_alpha: 0.0
+#### Filter
+src_seq_length: 150
+tgt_seq_length: 150
+
+# silently ignore empty lines in the data
+skip_empty_level: silent
+
+# General opts
+save_model: "run_en_ka/openmt.model"
+save_checkpoint_steps: 1000
+valid_steps: 1000
+train_steps: 50000
+early_stopping: 4
+keep_checkpoint: 2
+
+# Batching
+queue_size: 10000
+bucket_size: 32768
+world_size: 1
+gpu_ranks: [0]
+batch_type: "tokens"
+batch_size: 4096
+valid_batch_size: 4096
+max_generator_batches: 2
+accum_count: [4]
+accum_steps: [0]
+
+# Optimization
+model_dtype: "fp32"
+optim: "adam"
+learning_rate: 2
+warmup_steps: 8000
+decay_method: "noam"
+adam_beta2: 0.998
+max_grad_norm: 0
+label_smoothing: 0.1
+param_init: 0
+param_init_glorot: true
+normalization: "tokens"
+
+# Model
+encoder_type: transformer
+decoder_type: transformer
+position_encoding: true
+enc_layers: 6
+dec_layers: 6
+heads: 8
+rnn_size: 512
+word_vec_size: 512
+transformer_ff: 2048
+dropout_steps: [0]
+dropout: [0.1]
+attention_dropout: [0.1]
